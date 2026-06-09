@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Schematic Analyzer</title>
+    <style>
+        :root {
+            --bg-main: #0d1117; --bg-card: #161b22; --border: #30363d;
+            --text-main: #c9d1d9; --text-muted: #8b949e; --accent-green: #2ea44f;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, sans-serif; background: var(--bg-main); color: var(--text-main); height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+        header { background: var(--bg-card); border-bottom: 1px solid var(--border); padding: 12px 24px; display: flex; justify-content: space-between; align-items: center; }
+        .upload-btn { background: var(--accent-green); color: white; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 500; }
+        #file-input { display: none; }
+        .main-container { display: flex; flex: 1; overflow: hidden; }
+        .sidebar { width: 300px; background: var(--bg-card); border-right: 1px solid var(--border); padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+        .metric-card { background: var(--bg-main); border: 1px solid var(--border); padding: 12px; border-radius: 6px; }
+        .metric-title { font-size: 11px; color: var(--text-muted); text-transform: uppercase; font-weight: 600; margin-bottom: 4px; }
+        .metric-value { font-size: 20px; font-weight: 700; font-family: monospace; }
+        .viewer-container { flex: 1; background: #05070a; display: flex; align-items: center; justify-content: center; position: relative; }
+        canvas { border: 1px solid var(--border); background: #090d13; }
+        .status-bar { padding: 4px 16px; font-size: 12px; color: var(--text-muted); background: var(--bg-card); border-top: 1px solid var(--border); display: flex; justify-content: space-between; }
+    </style>
+</head>
+<body>
+    <header>
+        <h3>Schematic Analyzer</h3>
+        <label class="upload-btn">Upload .kicad_sch <input type="file" id="file-input" accept=".kicad_sch"></label>
+    </header>
+    <div class="main-container">
+        <div class="sidebar">
+            <div class="metric-card"><div class="metric-title">Wires</div><div id="stat-wires" class="metric-value">0</div></div>
+            <div class="metric-card"><div class="metric-title">Junctions</div><div id="stat-junctions" class="metric-value">0</div></div>
+            <div class="metric-card"><div class="metric-title">Components</div><div id="stat-components" class="metric-value">0</div></div>
+            <div class="metric-card"><div class="metric-title">Graph Nodes</div><div id="stat-nodes" class="metric-value">0</div></div>
+        </div>
+        <div class="viewer-container" id="canvas-parent">
+            <canvas id="schematic-canvas"></canvas>
+        </div>
+    </div>
+    <div class="status-bar">
+        <span id="status-text">System Idle.</span>
+        <span id="status-perf"></span>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('schematic-canvas');
+        const ctx = canvas.getContext('2d');
+        let currentData = null;
+
+        document.getElementById('file-input').addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            document.getElementById('status-text').innerText = "Processing...";
+            const t0 = performance.now();
+            const formData = new FormData();
+            formData.append('file', file);
+
+            try {
+                const response = await fetch('/api/upload', { method: 'POST', body: formData });
+                if (!response.ok) throw new Error(await response.text());
+                
+                currentData = await response.json();
+                const t1 = performance.now();
+
+                document.getElementById('stat-wires').innerText = currentData.wires?.length || 0;
+                document.getElementById('stat-junctions').innerText = currentData.junctions?.length || 0;
+                document.getElementById('stat-components').innerText = currentData.components?.length || 0;
+                document.getElementById('stat-nodes').innerText = currentData.nodes?.length || 0;
+
+                document.getElementById('status-text').innerText = `Parsed: ${file.name}`;
+                document.getElementById('status-perf').innerText = `${(t1 - t0).toFixed(1)} ms`;
+                renderSchematic();
+            } catch (err) {
+                document.getElementById('status-text').innerText = `Error: ${err.message}`;
+            }
+        });
+
+        function renderSchematic() {
+            if (!currentData) return;
+            const parent = document.getElementById('canvas-parent');
+            canvas.width = parent.clientWidth - 40;
+            canvas.height = parent.clientHeight - 40;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            let points = [...currentData.wires.map(w => [w.start.x, w.start.y]), ...currentData.wires.map(w => [w.end.x, w.end.y])];
+            if(points.length === 0) return;
+
+            let xs = points.map(p => p[0]), ys = points.map(p => p[1]);
+            let minX = Math.min(...xs), maxX = Math.max(...xs), minY = Math.min(...ys), maxY = Math.max(...ys);
+            let pad = 50;
+            let scale = Math.min((canvas.width - pad*2) / (maxX - minX || 1), (canvas.height - pad*2) / (maxY - minY || 1));
+
+            const tX = x => pad + (x - minX) * scale;
+            const tY = y => pad + (y - minY) * scale;
+
+            ctx.strokeStyle = '#2ea44f'; ctx.lineWidth = 2;
+            currentData.wires.forEach(w => {
+                ctx.beginPath(); ctx.moveTo(tX(w.start.x), tY(w.start.y)); ctx.lineTo(tX(w.end.x), tY(w.end.y)); ctx.stroke();
+            });
+
+            ctx.fillStyle = '#2ea44f';
+            currentData.junctions.forEach(j => {
+                ctx.beginPath(); ctx.arc(tX(j.location.x), tY(j.location.y), 4, 0, 2 * Math.PI); ctx.fill();
+            });
+
+            ctx.fillStyle = '#58a6ff'; ctx.font = '12px monospace';
+            currentData.components.forEach(c => {
+                let cx = tX(c.location.x), cy = tY(c.location.y);
+                ctx.fillRect(cx - 8, cy - 8, 16, 16);
+                ctx.fillStyle = '#ffffff'; ctx.fillText(c.reference, cx + 12, cy - 2);
+                ctx.fillStyle = '#8b949e'; ctx.fillText(c.value, cx + 12, cy + 10);
+                ctx.fillStyle = '#58a6ff';
+            });
+        }
+        window.addEventListener('resize', renderSchematic);
+    </script>
+</body>
+</html>
