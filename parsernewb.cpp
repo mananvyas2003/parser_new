@@ -1,477 +1,477 @@
+// ============================================================================
+//  main.cpp
+//  KiCad Schematic Parsing, Interpreting, and Connectivity Pipeline
+// ============================================================================
+
 #include <iostream>
 #include <fstream>
 #include <vector>
-#include <string>
 #include <chrono>
-#include <sstream>
+#include <algorithm>
+#include <string>
 
 #include "lexer.h"
 #include "parser.h"
 #include "interpreter.h"
 #include "net_resolver.h"
+#include "geometry.h"
+#include "pin_transform.h"
+#include "pin_mapper.h"
+#include "net_database.h"
+#include "pin_mapper_debug.h"
+#include "graph.h"
+#include "graph_builder.h"
+#include "graph_debug.h"
+#include "graph_search.h"
 
 
-void ExportNetResolverJSON(
-    const NetResolver& resolver)
-{
-    std::ofstream file(
-        "net_resolver_output.json");
-
-    if (!file.is_open())
-        return;
-
-    file << "{\n";
-    file << "  \"nodes\": [\n";
-
-    const auto& nodes = resolver.GetNodes();
-    for (size_t i = 0; i < nodes.size(); ++i)
-    {
-        file << "    {\n";
-        file << "      \"id\": " << nodes[i].id << ",\n";
-        file << "      \"position\": { \"x\": " << nodes[i].position.x << ", \"y\": " << nodes[i].position.y << " }\n";
-        file << "    }" << (i + 1 < nodes.size() ? "," : "") << "\n";
-    }
-    file << "  ],\n";
-
-    file << "  \"edges\": [\n";
-    const auto& edges = resolver.GetEdges();
-    for (size_t i = 0; i < edges.size(); ++i)
-    {
-        file << "    {\n";
-        file << "      \"id\": " << i << ",\n";
-        file << "      \"start_node\": " << edges[i].start_node << ",\n";
-        file << "      \"end_node\": " << edges[i].end_node << "\n";
-        file << "    }" << (i + 1 < edges.size() ? "," : "") << "\n";
-    }
-    file << "  ]\n";
-    file << "}\n";
-}
-
-
-void ExportInterpreterJSON(
-    const Schematic& schematic)
-{
-    std::ofstream file(
-        "interpreter_output.json");
-
-    if (!file.is_open())
-        return;
-
-    file << "{\n";
-
-    // Wires
-    file << "  \"wires\": [\n";
-    for (size_t i = 0; i < schematic.wires.size(); ++i)
-    {
-        const auto& wire = schematic.wires[i];
-        file << "    {\n";
-        file << "      \"start\": { \"x\": " << wire.start.x << ", \"y\": " << wire.start.y << " },\n";
-        file << "      \"end\": { \"x\": " << wire.end.x << ", \"y\": " << wire.end.y << " }\n";
-        file << "    }" << (i + 1 < schematic.wires.size() ? "," : "") << "\n";
-    }
-    file << "  ],\n";
-
-    // Junctions
-    file << "  \"junctions\": [\n";
-    for (size_t i = 0; i < schematic.junctions.size(); ++i)
-    {
-        const auto& junc = schematic.junctions[i];
-        file << "    {\n";
-        file << "      \"location\": { \"x\": " << junc.location.x << ", \"y\": " << junc.location.y << " }\n";
-        file << "    }" << (i + 1 < schematic.junctions.size() ? "," : "") << "\n";
-    }
-    file << "  ],\n";
-
-    // Labels
-    file << "  \"labels\": [\n";
-    for (size_t i = 0; i < schematic.labels.size(); ++i)
-    {
-        const auto& label = schematic.labels[i];
-        file << "    {\n";
-        file << "      \"name\": \"" << label.name << "\",\n";
-        file << "      \"location\": { \"x\": " << label.location.x << ", \"y\": " << label.location.y << " }\n";
-        file << "    }" << (i + 1 < schematic.labels.size() ? "," : "") << "\n";
-    }
-    file << "  ],\n";
-
-    // Components
-    file << "  \"components\": [\n";
-    for (size_t i = 0; i < schematic.components.size(); ++i)
-    {
-        const auto& comp = schematic.components[i];
-        file << "    {\n";
-        file << "      \"reference\": \"" << comp.reference << "\",\n";
-        file << "      \"value\": \"" << comp.value << "\",\n";
-        file << "      \"location\": { \"x\": " << comp.location.x << ", \"y\": " << comp.location.y << " },\n";
-        file << "      \"rotation\": " << comp.rotation << "\n";
-        file << "    }" << (i + 1 < schematic.components.size() ? "," : "") << "\n";
-    }
-    file << "  ]\n";
-
-    file << "}\n";
-}
-
-
-std::string ASTNodeToJSON(
-    const std::vector<ASTNode>& pool,
-    uint32_t node_idx,
-    int indent_level = 0)
-{
-    if (node_idx == 0 ||
-        node_idx >= pool.size())
-    {
-        return "null";
-    }
-
-    const ASTNode& node =
-        pool[node_idx];
-
-    std::string indent(
-        indent_level * 2,
-        ' ');
-
-    std::ostringstream ss;
-
-    ss << "{\n";
-
-    ss << indent
-        << "  \"type\": ";
-
-    switch (node.type)
-    {
-    case NodeType::List:
-        ss << "\"List\"";
-        break;
-
-    case NodeType::Symbol:
-        ss << "\"Symbol\"";
-        break;
-
-    case NodeType::Number:
-        ss << "\"Number\"";
-        break;
-
-    case NodeType::String:
-        ss << "\"String\"";
-        break;
-    }
-
-    if (node.type != NodeType::List &&
-        node.text.start != nullptr)
-    {
-        std::string text(
-            node.text.start,
-            node.text.length);
-
-        ss << ",\n"
-            << indent
-            << "  \"text\": \""
-            << text
-            << "\"";
-    }
-
-    if (node.type == NodeType::Number)
-    {
-        ss << ",\n"
-            << indent
-            << "  \"value\": "
-            << node.number_value;
-    }
-
-    if (node.first_child != 0)
-    {
-        ss << ",\n"
-            << indent
-            << "  \"children\": [\n";
-
-        uint32_t child =
-            node.first_child;
-
-        bool first = true;
-
-        while (child != 0)
-        {
-            if (!first)
-            {
-                ss << ",\n";
-            }
-
-            ss << indent
-                << "    "
-                << ASTNodeToJSON(
-                    pool,
-                    child,
-                    indent_level + 2);
-
-            first = false;
-
-            child =
-                pool[child].next_sibling;
-        }
-
-        ss << "\n"
-            << indent
-            << "  ]";
-    }
-
-    ss << "\n"
-        << indent
-        << "}";
-
-    return ss.str();
-}
-
-
-
+#include "dashboard.h"
+#include "web_dashboard.h"
 
 int main(int argc, char** argv)
 {
-    // ---------------------------------------------------------
-    // File Selection
-    // ---------------------------------------------------------
-
-    std::string filepath =
-        "ESP32_Status_Monitor.kicad_sch";
+    // ========================================================================
+    // FILE PATH CONFIGURATION (Terminal Input)
+    // ========================================================================
+    std::string filepath;
 
     if (argc > 1)
     {
         filepath = argv[1];
     }
-
-    // ---------------------------------------------------------
-    // Load File
-    // ---------------------------------------------------------
-
-    std::ifstream file(
-        filepath,
-        std::ios::binary |
-        std::ios::ate);
-
-    if (!file.is_open())
+    else
     {
-        std::cerr
-            << "\nERROR: Could not open file:\n"
-            << filepath
-            << "\n";
+        std::cout << "=========================================================\n";
+        std::cout << "  KiCad Schematic Parser\n";
+        std::cout << "=========================================================\n";
+        std::cout << "Please enter the path to the .kicad_sch file.\n";
+        std::cout << "You can use an absolute path (e.g., C:\\Users\\...\\file.kicad_sch)\n";
+        std::cout << "or a relative path if the file is in the current directory.\n";
+        std::cout << "> ";
 
-        return 1;
-    }
+        std::getline(std::cin, filepath);
 
-    size_t file_size =
-        static_cast<size_t>(
-            file.tellg());
-
-    file.seekg(0);
-
-    std::vector<char> source_buffer(
-        file_size + 1);
-
-    file.read(
-        source_buffer.data(),
-        file_size);
-
-    source_buffer[file_size] = '\0';
-
-    file.close();
-
-    // ---------------------------------------------------------
-    // Lexer + Parser
-    // ---------------------------------------------------------
-
-    auto parse_start =
-        std::chrono::high_resolution_clock::now();
-
-    Lexer lexer(
-        source_buffer.data());
-
-    Parser parser(
-        lexer);
-
-    uint32_t root_node_idx =
-        parser.Parse();
-
-    auto parse_end =
-        std::chrono::high_resolution_clock::now();
-
-    double parse_time_ms =
-        std::chrono::duration<double,
-        std::milli>(
-            parse_end -
-            parse_start).count();
-
-    if (root_node_idx == 0)
-    {
-        std::cerr
-            << "\nERROR: Parsing failed.\n";
-
-        return 1;
-    }
-
-    const auto& node_pool =
-        parser.GetPool();
-
-    // ---------------------------------------------------------
-    // AST JSON
-    // ---------------------------------------------------------
-
-    std::string ast_json =
-        ASTNodeToJSON(
-            node_pool,
-            root_node_idx);
-
-    {
-        std::ofstream out(
-            "ast_output.json");
-
-        if (out.is_open())
+        // Basic cleanup: remove quotes if the user drag-and-dropped the file into the terminal
+        if (!filepath.empty() && filepath.front() == '"' && filepath.back() == '"')
         {
-            out << ast_json;
+            filepath = filepath.substr(1, filepath.length() - 2);
+        }
+
+        if (filepath.empty())
+        {
+            std::cout << "No file path provided. Using default 'ESP32_Status_Monitor.kicad_sch'.\n";
+            filepath = "ESP32_Status_Monitor.kicad_sch";
         }
     }
 
-    // ---------------------------------------------------------
-    // Interpreter
-    // ---------------------------------------------------------
+    // ========================================================================
+    // BINARY FILE INGESTION
+    // ========================================================================
+    std::ifstream file(filepath, std::ios::binary | std::ios::ate);
 
-    Interpreter interpreter(
-        node_pool);
+    if (!file.is_open())
+    {
+        std::cerr << "ERROR: Failed to open file:\n" << filepath << "\n";
+        std::cerr << "Please ensure the path is correct and the file exists.\n";
+        return 1;
+    }
 
-    Schematic schematic =
-        interpreter.Execute(
-            root_node_idx);
+    const size_t file_size = static_cast<size_t>(file.tellg());
+    file.seekg(0);
 
-    ExportInterpreterJSON(schematic);
+    std::vector<char> buffer(file_size + 1);
+    file.read(buffer.data(), file_size);
+    buffer[file_size] = '\0';
+    file.close();
 
-    // ---------------------------------------------------------
-    // Net Resolver
-    // ---------------------------------------------------------
+    std::cout << "Successfully loaded: " << filepath << " (" << file_size << " bytes)\n";
 
-    NetResolver resolver(
-        schematic);
+    // ========================================================================
+    // LEXER & AST PARSER TIMING PIPELINE
+    // ========================================================================
+    auto parse_start = std::chrono::high_resolution_clock::now();
 
-    resolver.BuildNodes();
+    Lexer lexer(buffer.data());
+    Parser parser(lexer);
+    uint32_t root_node_idx = parser.Parse();
 
-    resolver.BuildEdges();
+    auto parse_end = std::chrono::high_resolution_clock::now();
+    const double parse_time_ms = std::chrono::duration<double, std::milli>(parse_end - parse_start).count();
 
-    ExportNetResolverJSON(resolver);
+    const auto& node_pool = parser.GetPool();
 
-    // ---------------------------------------------------------
-    // Terminal Report
-    // ---------------------------------------------------------
+    if (root_node_idx == 0)
+    {
+        std::cerr << "ERROR: Parser returned empty tree.\n";
+        return 1;
+    }
+
+    // ========================================================================
+    // SCHEMATIC S-EXPRESSION INTERPRETER
+    // ========================================================================
+    Interpreter interpreter(node_pool);
+    Schematic schematic = interpreter.Execute(root_node_idx);
+
+    // ========================================================================
+    // GEOMETRIC NET RESOLVE
+    // ========================================================================
+    NetResolver resolver(schematic);
+    resolver.Resolve();
+    std::cout << "the PrintLabelledNets";
+    resolver.PrintLabelledNets();
+
+    // ========================================================================
+    // DATA SERIALIZATION EXPORTS
+    // ========================================================================
+    resolver.ExportDashboardData("dashboard_data.json");
+    resolver.ExportNetsJSON("nets.json");
+
+    // ========================================================================
+    // CONSOLE PIPELINE REPORT
+    // ========================================================================
+    std::cout << "\n";
+    std::cout << "=========================================================\n";
+    std::cout << "                KICAD PIPELINE REPORT\n";
+    std::cout << "=========================================================\n";
+
+    std::cout << "\nFILE\n";
+    std::cout << "---------------------------------------------------------\n";
+    std::cout << "Path        : " << filepath << "\n";
+    std::cout << "Size        : " << file_size << " bytes\n";
+    std::cout << "Parse Time  : " << parse_time_ms << " ms\n";
+
+    std::cout << "\nPARSER\n";
+    std::cout << "---------------------------------------------------------\n";
+    std::cout << "AST Nodes   : " << node_pool.size() << "\n";
+    std::cout << "Root Node   : " << root_node_idx << "\n";
+
+    std::cout << "\nINTERPRETER\n";
+    std::cout << "---------------------------------------------------------\n";
+    std::cout << "Wires       : " << schematic.wires.size() << "\n";
+    std::cout << "Junctions   : " << schematic.junctions.size() << "\n";
+    std::cout << "Labels      : " << schematic.labels.size() << "\n";
+    std::cout << "Components  : " << schematic.components.size() << "\n";
+
+    std::cout << "\nNET RESOLVER\n";
+    std::cout << "---------------------------------------------------------\n";
+    std::cout << "Nodes       : " << resolver.GetNodes().size() << "\n";
+    std::cout << "Edges       : " << resolver.GetEdges().size() << "\n";
+    std::cout << "Nets        : " << resolver.GetNets().size() << "\n";
+    std::cout << "Largest Net : " << resolver.GetLargestNetSize() << " nodes\n";
+
+
+    std::cout << "\nOUTPUT\n";
+    std::cout << "---------------------------------------------------------\n";
+    std::cout << "dashboard_data.json\n";
+    std::cout << "nets.json\n";
+
+    std::cout << "\n";
+    std::cout << "=========================================================\n";
+    std::cout << "                NET CRITICAL INSPECTION\n";
+    std::cout << "=========================================================\n";
+    // Isolated verification to drill into target named net behavior
+    resolver.PrintLargestNet();
+
+    std::cout << "\n";
+    std::cout << "=========================================================\n";
+    std::cout << "                NET PREVIEW (FIRST 10)\n";
+    std::cout << "=========================================================\n";
+
+    const auto& nets = resolver.GetNets();
+    size_t preview_count = std::min<size_t>(nets.size(), 10);
+
+    for (size_t i = 0; i < preview_count; i++)
+    {
+        const auto& net = nets[i];
+
+        std::cout << "\nNet " << net.id << " (Root Node ID: " << net.root_node << ")\n";
+        std::cout << "  Nodes      : " << net.node_ids.size() << "\n";
+        std::cout << "  Labels     : " << net.labels.size() << "\n";
+        std::cout << "  Components : " << net.components.size() << "\n";
+
+        if (!net.labels.empty())
+        {
+            std::cout << "  Label Names: ";
+            for (const auto& label : net.labels)
+            {
+                std::cout << label << " ";
+            }
+            std::cout << "\n";
+        }
+    }
+
+    std::cout << "\n=========================================================\n";
+    std::cout << "                RAW COMPONENT MANIFEST\n";
+    std::cout << "=========================================================\n";
+
+    for (const auto& c :
+        schematic.components)
+    {
+        std::cout
+            << c.reference
+            << "  "
+            << c.value
+            << "\n";
+
+        std::cout
+            << "Pins : "
+            << c.pins.size()
+            << "\n";
+    }
+    
+
+    
+    
+
 
     std::cout
-        << "\n========================================================\n";
+        << "\n====================================\n";
 
     std::cout
-        << "                KICAD PARSER TEST HARNESS\n";
+        << "PIN TRANSFORM TEST\n";
 
     std::cout
-        << "========================================================\n";
+        << "====================================\n";
+
+    for (auto& comp : schematic.components)
+    {
+        std::cout
+            << comp.reference
+            << " Pins="
+            << comp.pins.size()
+            << "\n";
+
+        PinTransform::ComputeWorldPins(comp);
+    }
 
     std::cout
-        << "\nFILE\n";
+        << "\n====================================\n";
 
     std::cout
-        << "--------------------------------------------------------\n";
+        << "PRINTING COMPONENT PINS\n";
 
     std::cout
-        << "Path            : "
-        << filepath
+        << "====================================\n";
+
+    for (const auto& comp : schematic.components)
+    {
+        if (!comp.pins.empty())
+        {
+            PinTransform::PrintPins(comp);
+        }
+    }
+
+
+
+    PinMapper mapper(
+        schematic,
+        resolver);
+
+    mapper.Build();
+
+    mapper.PrintConnections();
+
+    NetDatabase database(
+        mapper);
+
+    database.Build();
+
+    database.Print();
+
+
+
+    std::cout << "\nThe debug class is\n";
+
+    for (auto& comp : schematic.components)
+    {
+        PinTransform::ComputeWorldPins(comp);
+    }
+
+    for (const auto& comp : schematic.components)
+    {
+        if (comp.reference == "U1")
+        {
+            PinMapperDebug::PrintComponent(comp);
+        }
+    }
+
+
+    std::cout
+        << "\n====================================\n";
+
+    std::cout
+        << "PIN PIPELINE DEBUG\n";
+
+    std::cout
+        << "====================================\n";
+
+    for (const auto& comp : schematic.components)
+    {
+        if (comp.reference != "U1")
+            continue;
+
+        std::cout
+            << "\nComponent : "
+            << comp.reference
+            << "\n";
+
+        std::cout
+            << "Position : "
+            << comp.location.x
+            << ", "
+            << comp.location.y
+            << "\n";
+
+        std::cout
+            << "Rotation : "
+            << comp.rotation
+            << "\n";
+
+        std::cout
+            << "------------------------------------\n";
+
+        for (const auto& pin : comp.pins)
+        {
+            std::cout
+                << pin.number
+                << " "
+                << pin.name
+                << "\n";
+
+            std::cout
+                << "Pin Location : "
+                << pin.location.x
+                << ", "
+                << pin.location.y
+                << "\n";
+
+            std::cout
+                << "World        : "
+                << pin.world_location.x
+                << ", "
+                << pin.world_location.y
+                << "\n";
+
+            std::cout
+                << "\n";
+        }
+    }
+    
+
+    std::cout << "\nNearest Node Debug\n";
+
+    for (const auto& comp : schematic.components)
+    {
+        if (comp.reference == "U1")
+        {
+            PinMapperDebug::PrintNearestNodes(
+                comp,
+                resolver);
+        }
+    }
+
+
+    std::cout << "\n graph builder test\n";
+
+    GraphBuilder builder;
+
+    Graph graph =
+        builder.Build(schematic);
+
+    std::cout
+        << "\n============================\n";
+
+    std::cout
+        << "GRAPH TEST\n";
+
+    std::cout
+        << "============================\n";
+
+    std::cout
+        << "Vertices : "
+        << graph.GetVertices().size()
         << "\n";
 
     std::cout
-        << "Size            : "
-        << file_size
-        << " bytes\n";
-
-    std::cout
-        << "\nPARSER\n";
-
-    std::cout
-        << "--------------------------------------------------------\n";
-
-    std::cout
-        << "Parse Time      : "
-        << parse_time_ms
-        << " ms\n";
-
-    std::cout
-        << "AST Nodes       : "
-        << node_pool.size()
+        << "Edges : "
+        << graph.GetEdges().size()
         << "\n";
 
-    std::cout
-        << "Root Node       : "
-        << root_node_idx
-        << "\n";
+
+    std::cout << "\nthese are the debug of the graphs\n";
+
+
+    // 1. Run the new search/net extraction
+    auto graph_nets = GraphSearch::ExtractNets(graph);
+
+    // 2. Print the extracted electrical nets
+    // This will show you exactly which pins connect to which wires
+    GraphDebug::PrintNets(graph);
+
+
+    GraphDebug::PrintVertices(graph);
+
+    GraphDebug::PrintEdges(graph);
+
+    GraphDebug::PrintAdjacency(graph);
+
+
+
 
     std::cout
-        << "\nINTERPRETER\n";
+        << "\nWEB TEST\n";
 
     std::cout
-        << "--------------------------------------------------------\n";
-
-    std::cout
-        << "Wires           : "
-        << schematic.wires.size()
-        << "\n";
-
-    std::cout
-        << "Junctions       : "
-        << schematic.junctions.size()
-        << "\n";
-
-    std::cout
-        << "Labels          : "
-        << schematic.labels.size()
-        << "\n";
-
-    std::cout
-        << "Components      : "
+        << "Components: "
         << schematic.components.size()
         << "\n";
 
     std::cout
-        << "\nNET RESOLVER\n";
-
-    std::cout
-        << "--------------------------------------------------------\n";
-
-    std::cout
-        << "Connectivity Nodes : "
+        << "Nodes: "
         << resolver.GetNodes().size()
         << "\n";
 
     std::cout
-        << "Connectivity Edges : "
+        << "Edges: "
         << resolver.GetEdges().size()
         << "\n";
 
     std::cout
-        << "\nFILES GENERATED\n";
+        << "Nets: "
+        << resolver.GetNets().size()
+        << "\n";
+
+
+
+
+
+
+
 
     std::cout
-        << "--------------------------------------------------------\n";
+        << "\nLaunching Web Dashboard...\n";
 
-    std::cout
-        << "ast_output.json\n"
-        << "interpreter_output.json\n"
-        << "net_resolver_output.json\n";
+    WebDashboardData wd;
 
-    std::cout
-        << "\n========================================================\n";
+    wd.filepath = filepath;
+    wd.file_size_bytes = file_size;
+    wd.parse_time_ms = parse_time_ms;
 
-    if (schematic.wires.empty())
-    {
-        std::cout
-            << "\nWARNING: No wires extracted.\n";
-    }
+    wd.ast_node_count = node_pool.size();
+    wd.root_node_idx = root_node_idx;
 
-    if (schematic.junctions.empty())
-    {
-        std::cout
-            << "\nWARNING: No junctions extracted.\n";
-    }
+    wd.parser_stats =
+        Dashboard::CalculateParserStats(
+            node_pool);
 
-    return 0;
+    wd.schematic = &schematic;
+    wd.nodes = &resolver.GetNodes();
+    wd.edges = &resolver.GetEdges();
+    wd.nets = &resolver.GetNets();
+
+    return WebDashboard::Serve(
+        wd,
+        8080,
+        true);
+
 }

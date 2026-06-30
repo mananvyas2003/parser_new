@@ -140,19 +140,42 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="dashboard.cpp" />
+    <ClCompile Include="geometry.cpp" />
+    <ClCompile Include="graph..cpp" />
+    <ClCompile Include="graph_builder.cpp" />
+    <ClCompile Include="graph_debug.cpp" />
+    <ClCompile Include="graph_search.cpp" />
     <ClCompile Include="interpreter.cpp" />
     <ClCompile Include="lexer.cpp" />
+    <ClCompile Include="net_database.cpp" />
     <ClCompile Include="net_resolver.cpp" />
     <ClCompile Include="parser.cpp" />
     <ClCompile Include="parsernewb.cpp" />
+    <ClCompile Include="pin_mapper.cpp" />
+    <ClCompile Include="pin_mapper_debug.cpp" />
+    <ClCompile Include="pin_transform.cpp" />
+    <ClCompile Include="point_hash.cpp" />
+    <ClCompile Include="web_dashboard.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="C:\Users\chava\Downloads\imgui.h" />
     <ClInclude Include="dashboard.h" />
+    <ClInclude Include="geometry.h" />
+    <ClInclude Include="graph.h" />
+    <ClInclude Include="graph_builder.h" />
+    <ClInclude Include="graph_debug.h" />
+    <ClInclude Include="graph_search.h" />
+    <ClInclude Include="graph_types.h" />
     <ClInclude Include="interpreter.h" />
     <ClInclude Include="lexer.h" />
+    <ClInclude Include="net_database.h" />
     <ClInclude Include="net_resolver.h" />
     <ClInclude Include="parser.h" />
+    <ClInclude Include="pin_mapper.h" />
+    <ClInclude Include="pin_mapper_debug.h" />
+    <ClInclude Include="pin_transform.h" />
+    <ClInclude Include="point_hash.h" />
+    <ClInclude Include="web_dashboard.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
