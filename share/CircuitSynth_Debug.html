@@ -1,0 +1,785 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Circuit Synthesis Compiler</title>
+  <style>
+    :root {
+      --bg: #0f1419;
+      --panel: #1a2332;
+      --border: #2d3a4f;
+      --text: #e7ecf3;
+      --muted: #8b9bb4;
+      --accent: #3d9cf0;
+      --ok: #3ecf8e;
+      --warn: #e6b84d;
+      --err: #e85d5d;
+      --mono: "Cascadia Code", "Consolas", monospace;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+    header {
+      padding: 1.5rem 2rem;
+      border-bottom: 1px solid var(--border);
+      background: linear-gradient(180deg, #152033 0%, var(--bg) 100%);
+    }
+    header h1 {
+      margin: 0 0 0.35rem;
+      font-size: 1.35rem;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+    }
+    header p { margin: 0; color: var(--muted); font-size: 0.9rem; }
+    main {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 1.5rem 2rem 3rem;
+    }
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1.25rem 1.4rem;
+      margin-bottom: 1.25rem;
+    }
+    label {
+      display: block;
+      font-size: 0.8rem;
+      color: var(--muted);
+      margin-bottom: 0.4rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    textarea, input[type="text"] {
+      width: 100%;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      color: var(--text);
+      border-radius: 8px;
+      padding: 0.75rem 0.9rem;
+      font-size: 1rem;
+      font-family: inherit;
+      resize: vertical;
+    }
+    textarea:focus, input:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
+    .row {
+      display: flex;
+      gap: 1rem;
+      flex-wrap: wrap;
+      align-items: center;
+      margin-top: 1rem;
+    }
+    .row label.chk {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      text-transform: none;
+      letter-spacing: 0;
+      font-size: 0.95rem;
+      color: var(--text);
+      cursor: pointer;
+    }
+    button {
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 0.7rem 1.4rem;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    button:hover { filter: brightness(1.08); }
+    button:disabled { opacity: 0.5; cursor: wait; }
+    .examples { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.75rem; }
+    .examples button {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--muted);
+      font-weight: 400;
+      font-size: 0.8rem;
+      padding: 0.35rem 0.7rem;
+    }
+    .examples button:hover { border-color: var(--accent); color: var(--text); }
+    .status {
+      font-family: var(--mono);
+      font-size: 0.85rem;
+      padding: 0.6rem 0.9rem;
+      border-radius: 6px;
+      margin-bottom: 1rem;
+      display: none;
+    }
+    .status.show { display: block; }
+    .status.ok { background: #163528; color: var(--ok); border: 1px solid #2a5a42; }
+    .status.err { background: #3a1a1a; color: var(--err); border: 1px solid #5a2a2a; }
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.25rem;
+    }
+    @media (max-width: 800px) { .grid { grid-template-columns: 1fr; } }
+    h2 {
+      margin: 0 0 0.85rem;
+      font-size: 0.85rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      font-weight: 600;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.9rem;
+    }
+    th, td {
+      text-align: left;
+      padding: 0.45rem 0.5rem;
+      border-bottom: 1px solid var(--border);
+    }
+    th { color: var(--muted); font-weight: 500; font-size: 0.75rem; text-transform: uppercase; }
+    td.mono { font-family: var(--mono); font-size: 0.82rem; }
+    .kv { font-family: var(--mono); font-size: 0.85rem; line-height: 1.7; }
+    .kv span { color: var(--muted); }
+    .pill {
+      display: inline-block;
+      padding: 0.15rem 0.5rem;
+      border-radius: 999px;
+      font-size: 0.75rem;
+      font-family: var(--mono);
+    }
+    .pill.ok { background: #163528; color: var(--ok); }
+    .pill.warn { background: #3a3018; color: var(--warn); }
+    pre {
+      margin: 0;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.9rem;
+      overflow: auto;
+      max-height: 320px;
+      font-family: var(--mono);
+      font-size: 0.75rem;
+      line-height: 1.45;
+      color: #b8c5d6;
+    }
+    a.dl {
+      color: var(--accent);
+      text-decoration: none;
+      font-size: 0.9rem;
+    }
+    a.dl:hover { text-decoration: underline; }
+    #results { display: none; }
+    #results.show { display: block; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Circuit Synthesis Compiler</h1>
+    <p>Prompt â†’ topology â†’ physics sizing â†’ part binding â†’ verified IR â†’ KiCad schematic</p>
+  </header>
+
+  <main>
+    <div class="card">
+      <label for="prompt">Design prompt</label>
+      <textarea id="prompt" rows="2">design a 12 V to 5 V buck converter at 3 A</textarea>
+      <div class="examples">
+        <button type="button" data-p="design a 12 V to 5 V buck converter at 3 A">12Vâ†’5V @ 3A</button>
+        <button type="button" data-p="24V to 3.3V buck at 2 A, 1 MHz">24Vâ†’3.3V @ 2A 1MHz</button>
+        <button type="button" data-p="step-down 48 V to 12 V at 5 A, 250 kHz">48Vâ†’12V @ 5A</button>
+      </div>
+      <div class="row">
+        <label class="chk">
+          <input type="checkbox" id="controller" />
+          Include controller IC (DRIVE driven)
+        </label>
+        <button id="run" type="button">Synthesize</button>
+      </div>
+    </div>
+
+    <div id="status" class="status"></div>
+
+    <div id="results">
+      <div class="grid">
+        <div class="card">
+          <h2>Specification</h2>
+          <div class="kv" id="spec"></div>
+        </div>
+        <div class="card">
+          <h2>Sizing (ideal)</h2>
+          <div class="kv" id="sizing"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Bound parts <span id="erc-pill"></span></h2>
+        <table>
+          <thead>
+            <tr><th>Ref</th><th>Role</th><th>MPN</th><th>Value</th><th>Package</th></tr>
+          </thead>
+          <tbody id="parts"></tbody>
+        </table>
+        <p style="margin: 0.9rem 0 0; color: var(--muted); font-size: 0.85rem;">
+          <a class="dl" id="dl-sch" href="#" download>Download .kicad_sch</a>
+          &nbsp;Â·&nbsp;
+          <a class="dl" id="dl-json" href="#" download>Download netlist JSON</a>
+        </p>
+      </div>
+
+      <div class="grid">
+        <div class="card">
+          <h2>Binding trace (reject / retry)</h2>
+          <pre id="bind"></pre>
+        </div>
+        <div class="card">
+          <h2>Nets</h2>
+          <pre id="nets"></pre>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Electrical IR (JSON)</h2>
+        <pre id="json"></pre>
+      </div>
+    </div>
+  </main>
+
+  
+  <script>
+    // ===== Inlined synthesis engine (debug / share build) =====
+// Browser port of the circuit-synthesis compiler (Phases 1â€“7 + prompt/bind).
+// Runs entirely client-side so it can host on Vercel static.
+
+const PartType = {
+  Unknown: 0, Resistor: 1, Capacitor: 2, Inductor: 3,
+  Diode: 4, Mosfet: 5, IC: 6,
+};
+
+const PartTypeName = {
+  [PartType.Unknown]: "Unknown",
+  [PartType.Resistor]: "Resistor",
+  [PartType.Capacitor]: "Capacitor",
+  [PartType.Inductor]: "Inductor",
+  [PartType.Diode]: "Diode",
+  [PartType.Mosfet]: "Mosfet",
+  [PartType.IC]: "IC",
+};
+
+function designatorPrefix(t) {
+  return ({ 1: "R", 2: "C", 3: "L", 4: "D", 5: "Q", 6: "U" })[t] || "X";
+}
+
+function buildBuckTopology(withController) {
+  const t = {
+    name: withController ? "buck_converter_controlled" : "buck_converter",
+    nodes: ["VIN", "SW", "VOUT", "GND", "DRIVE"],
+    components: [
+      { role: "HS_SWITCH", type: PartType.Mosfet, quantity: 1,
+        connections: [["D", "VIN"], ["S", "SW"], ["G", "DRIVE"]] },
+      { role: "FREEWHEEL_DIODE", type: PartType.Diode, quantity: 1,
+        connections: [["K", "SW"], ["A", "GND"]] },
+      { role: "OUTPUT_INDUCTOR", type: PartType.Inductor, quantity: 1,
+        connections: [["1", "SW"], ["2", "VOUT"]] },
+      { role: "INPUT_CAP", type: PartType.Capacitor, quantity: 1,
+        connections: [["1", "VIN"], ["2", "GND"]] },
+      { role: "OUTPUT_CAP", type: PartType.Capacitor, quantity: 1,
+        connections: [["1", "VOUT"], ["2", "GND"]] },
+      { role: "LOAD", type: PartType.Resistor, quantity: 1,
+        connections: [["1", "VOUT"], ["2", "GND"]] },
+    ],
+  };
+  if (withController) {
+    t.components.push({
+      role: "CONTROLLER", type: PartType.IC, quantity: 1,
+      connections: [["VIN", "VIN"], ["GND", "GND"], ["SW", "SW"], ["FB", "VOUT"], ["GATE", "DRIVE"]],
+    });
+  }
+  return t;
+}
+
+function instantiate(topology) {
+  const design = { topology: topology.name, nodes: [], components: [] };
+  const addNode = (name) => {
+    let i = design.nodes.findIndex((n) => n.name === name);
+    if (i >= 0) return i;
+    design.nodes.push({ name });
+    return design.nodes.length - 1;
+  };
+  topology.nodes.forEach(addNode);
+  const counters = {};
+  for (const tc of topology.components) {
+    const qty = Math.max(1, tc.quantity || 1);
+    for (let i = 0; i < qty; i++) {
+      const prefix = designatorPrefix(tc.type);
+      counters[prefix] = (counters[prefix] || 0) + 1;
+      const c = {
+        ref: prefix + counters[prefix],
+        role: tc.role,
+        type: tc.type,
+        value: 0,
+        mpn: "",
+        package: "",
+        pins: tc.connections.map(([pin, node]) => ({ name: pin, node: addNode(node) })),
+      };
+      design.components.push(c);
+    }
+  }
+  return design;
+}
+
+function parseBuckPrompt(text) {
+  const lower = text.toLowerCase();
+  if (!/(buck|step-down|step down)/.test(lower)) {
+    return { ok: false, error: "no recognized topology in prompt" };
+  }
+  const re = /([0-9]+(?:\.[0-9]+)?)\s*(mhz|khz|hz|ma|mv|kv|uh|nh|uf|nf|pf|v|a|w)\b/gi;
+  const volts = [], amps = [], freqs = [];
+  let m;
+  while ((m = re.exec(lower))) {
+    const val = parseFloat(m[1]);
+    const unit = m[2].toLowerCase();
+    if (unit === "v") volts.push(val);
+    else if (unit === "mv") volts.push(val / 1000);
+    else if (unit === "kv") volts.push(val * 1000);
+    else if (unit === "a") amps.push(val);
+    else if (unit === "ma") amps.push(val / 1000);
+    else if (unit === "hz") freqs.push(val);
+    else if (unit === "khz") freqs.push(val * 1e3);
+    else if (unit === "mhz") freqs.push(val * 1e6);
+  }
+  if (volts.length < 2) return { ok: false, error: "need two voltages (Vin and Vout)" };
+  if (!amps.length) return { ok: false, error: "need an output current" };
+  let [vin, vout] = volts;
+  if (vin < vout) [vin, vout] = [vout, vin];
+  return {
+    ok: true,
+    topology: "buck_converter",
+    spec: {
+      vin_v: vin,
+      vout_v: vout,
+      iout_a: amps[0],
+      fsw_hz: freqs[0] || 500e3,
+      ripple_current_ratio: 0.30,
+    },
+  };
+}
+
+function sizeBuck(spec, design) {
+  if (spec.vin_v <= 0 || spec.vout_v <= 0 || spec.iout_a <= 0) {
+    return { ok: false, error: "Vin, Vout, Iout must all be positive" };
+  }
+  if (spec.vout_v >= spec.vin_v) {
+    return { ok: false, error: "Buck requires Vout < Vin (step-down)" };
+  }
+  const dVout = 0.01 * spec.vout_v;
+  const dVin = 0.02 * spec.vin_v;
+  const duty = spec.vout_v / spec.vin_v;
+  const delta_il = spec.ripple_current_ratio * spec.iout_a;
+  const il_peak = spec.iout_a + delta_il / 2;
+  const l_henries = (spec.vout_v * (spec.vin_v - spec.vout_v)) /
+    (spec.vin_v * spec.fsw_hz * delta_il);
+  const cout_farads = delta_il / (8 * spec.fsw_hz * dVout);
+  const cin_farads = (spec.iout_a * duty * (1 - duty)) / (spec.fsw_hz * dVin);
+  const rload_ohms = spec.vout_v / spec.iout_a;
+  const r = { ok: true, duty, delta_il, il_peak, l_henries, cout_farads, cin_farads, rload_ohms };
+  if (design) {
+    for (const c of design.components) {
+      if (c.role === "OUTPUT_INDUCTOR") c.value = r.l_henries;
+      else if (c.role === "OUTPUT_CAP") c.value = r.cout_farads;
+      else if (c.role === "INPUT_CAP") c.value = r.cin_farads;
+      else if (c.role === "LOAD") c.value = r.rload_ohms;
+    }
+  }
+  return r;
+}
+
+function buildMockCatalog() {
+  return [
+    { mpn: "IND-6R8-3A0", type: PartType.Inductor, value: 6.8e-6, package: "1210", v_rating: 0, i_rating: 3 },
+    { mpn: "IND-6R8-5A0", type: PartType.Inductor, value: 6.8e-6, package: "1210", v_rating: 0, i_rating: 5 },
+    { mpn: "IND-4R7-6A0", type: PartType.Inductor, value: 4.7e-6, package: "1210", v_rating: 0, i_rating: 6 },
+    { mpn: "CAP-4U7-6V3", type: PartType.Capacitor, value: 4.7e-6, package: "0805", v_rating: 6.3, i_rating: 0 },
+    { mpn: "CAP-4U7-25V", type: PartType.Capacitor, value: 4.7e-6, package: "0805", v_rating: 25, i_rating: 0 },
+    { mpn: "CAP-6U8-10V", type: PartType.Capacitor, value: 6.8e-6, package: "0805", v_rating: 10, i_rating: 0 },
+    { mpn: "CAP-6U8-16V", type: PartType.Capacitor, value: 6.8e-6, package: "0805", v_rating: 16, i_rating: 0 },
+    { mpn: "CAP-10U-25V", type: PartType.Capacitor, value: 10e-6, package: "1206", v_rating: 25, i_rating: 0 },
+    { mpn: "CAP-2U2-25V", type: PartType.Capacitor, value: 2.2e-6, package: "0603", v_rating: 25, i_rating: 0 },
+    { mpn: "CAP-0U47-50V", type: PartType.Capacitor, value: 0.47e-6, package: "0402", v_rating: 50, i_rating: 0 },
+    { mpn: "MOS-20V-4A", type: PartType.Mosfet, value: 0, package: "SOT-23", v_rating: 20, i_rating: 4 },
+    { mpn: "MOS-30V-8A", type: PartType.Mosfet, value: 0, package: "PowerPAK", v_rating: 30, i_rating: 8 },
+    { mpn: "MOS-60V-10A", type: PartType.Mosfet, value: 0, package: "DPAK", v_rating: 60, i_rating: 10 },
+    { mpn: "MOS-100V-20A", type: PartType.Mosfet, value: 0, package: "D2PAK", v_rating: 100, i_rating: 20 },
+    { mpn: "IND-10U-8A0", type: PartType.Inductor, value: 10e-6, package: "1210", v_rating: 0, i_rating: 8 },
+    { mpn: "CAP-22U-25V", type: PartType.Capacitor, value: 22e-6, package: "1206", v_rating: 25, i_rating: 0 },
+    { mpn: "CAP-4U7-63V", type: PartType.Capacitor, value: 4.7e-6, package: "1206", v_rating: 63, i_rating: 0 },
+    { mpn: "DIO-20V-2A", type: PartType.Diode, value: 0, package: "SOD-123", v_rating: 20, i_rating: 2 },
+    { mpn: "DIO-40V-5A", type: PartType.Diode, value: 0, package: "SMA", v_rating: 40, i_rating: 5 },
+    { mpn: "DIO-100V-5A", type: PartType.Diode, value: 0, package: "SMC", v_rating: 100, i_rating: 5 },
+    { mpn: "BUCK-CTRL-1", type: PartType.IC, value: 0, package: "SOIC-8", v_rating: 100, i_rating: 0 },
+  ];
+}
+
+function findCandidates(catalog, q) {
+  let out = catalog.filter((p) => p.type === q.type);
+  if (q.has_value_target) {
+    const lo = q.value_target * (1 - q.value_tol);
+    const hi = q.value_target * (1 + q.value_tol);
+    out = out.filter((p) => p.value >= lo && p.value <= hi);
+  }
+  out.sort((a, b) => {
+    if (q.has_value_target) {
+      const da = Math.abs(a.value - q.value_target);
+      const db = Math.abs(b.value - q.value_target);
+      if (da !== db) return da - db;
+    }
+    if (a.i_rating !== b.i_rating) return a.i_rating - b.i_rating;
+    return a.v_rating - b.v_rating;
+  });
+  return out;
+}
+
+function computeRequirements(spec, sizing) {
+  return {
+    OUTPUT_INDUCTOR: {
+      needs_binding: true, has_value_target: true,
+      value_target: sizing.l_henries, value_tol: 0.30,
+      min_i_rating: sizing.il_peak * 1.2, min_v_rating: 0,
+    },
+    OUTPUT_CAP: {
+      needs_binding: true, has_value_target: true,
+      value_target: sizing.cout_farads, value_tol: 0.40,
+      min_v_rating: spec.vout_v / 0.5, min_i_rating: 0,
+    },
+    INPUT_CAP: {
+      needs_binding: true, has_value_target: true,
+      value_target: sizing.cin_farads, value_tol: 0.40,
+      min_v_rating: spec.vin_v / 0.8, min_i_rating: 0,
+    },
+    HS_SWITCH: {
+      needs_binding: true, has_value_target: false,
+      min_v_rating: spec.vin_v * 1.5, min_i_rating: sizing.il_peak * 1.5,
+    },
+    FREEWHEEL_DIODE: {
+      needs_binding: true, has_value_target: false,
+      min_v_rating: spec.vin_v * 1.3, min_i_rating: spec.iout_a,
+    },
+    LOAD: { needs_binding: false },
+    CONTROLLER: {
+      needs_binding: true, has_value_target: false,
+      min_v_rating: spec.vin_v * 1.3, min_i_rating: 0,
+    },
+  };
+}
+
+function verify(part, req) {
+  if (req.has_value_target) {
+    const lo = req.value_target * (1 - req.value_tol);
+    const hi = req.value_target * (1 + req.value_tol);
+    if (part.value < lo || part.value > hi) return { ok: false, reason: "value out of tolerance" };
+  }
+  if (req.min_v_rating > 0 && part.v_rating < req.min_v_rating) {
+    return { ok: false, reason: `insufficient voltage rating (${part.v_rating} < ${req.min_v_rating})` };
+  }
+  if (req.min_i_rating > 0 && part.i_rating < req.min_i_rating) {
+    return { ok: false, reason: `insufficient current rating (${part.i_rating} < ${req.min_i_rating})` };
+  }
+  return { ok: true, reason: "" };
+}
+
+function bindDesign(design, requirements, catalog) {
+  const outcomes = [];
+  let all_bound = true;
+  for (const c of design.components) {
+    const req = requirements[c.role];
+    const out = { ref: c.ref, role: c.role, skipped: false, bound: false, chosen_mpn: "", rejected: [], failure: "" };
+    if (!req || !req.needs_binding) {
+      out.skipped = true;
+      outcomes.push(out);
+      continue;
+    }
+    const candidates = findCandidates(catalog, {
+      type: c.type,
+      has_value_target: !!req.has_value_target,
+      value_target: req.value_target || 0,
+      value_tol: req.value_tol || 0.3,
+    });
+    for (const cand of candidates) {
+      const v = verify(cand, req);
+      if (v.ok) {
+        c.mpn = cand.mpn;
+        c.value = cand.value;
+        c.package = cand.package;
+        out.bound = true;
+        out.chosen_mpn = cand.mpn;
+        break;
+      }
+      out.rejected.push({ mpn: cand.mpn, reason: v.reason });
+    }
+    if (!out.bound) {
+      out.failure = "no catalog part satisfied requirements";
+      all_bound = false;
+    }
+    outcomes.push(out);
+  }
+  return { outcomes, all_bound };
+}
+
+function runErc(design) {
+  const errors = [], warnings = [];
+  const terminals = design.nodes.map(() => 0);
+  for (const c of design.components) {
+    for (const p of c.pins) {
+      if (p.node < 0 || p.node >= design.nodes.length) errors.push(`Unconnected pin ${c.ref}.${p.name}`);
+      else terminals[p.node]++;
+    }
+  }
+  if (!design.nodes.some((n) => n.name === "GND")) errors.push("No ground (GND) reference net");
+  terminals.forEach((n, i) => {
+    if (n === 0) warnings.push(`Net '${design.nodes[i].name}' has no terminals`);
+    else if (n === 1) warnings.push(`Net '${design.nodes[i].name}' is floating (single terminal)`);
+  });
+  return { errors, warnings, ok: errors.length === 0 };
+}
+
+function placeDesign(design) {
+  const origin = 25.4, spacing = 50.8, pitch = 2.54, cols = 3;
+  return design.components.map((c, i) => {
+    const n = c.pins.length;
+    return {
+      ref: c.ref,
+      type: c.type,
+      at: { x: origin + (i % cols) * spacing, y: origin + Math.floor(i / cols) * spacing },
+      pin_offsets: c.pins.map((p, j) => ({
+        name: p.name,
+        x: 0,
+        y: ((n - 1) / 2 - j) * pitch,
+      })),
+    };
+  });
+}
+
+function libNameFor(t) {
+  return ({ 1: "synth:R", 2: "synth:C", 3: "synth:L", 4: "synth:D", 5: "synth:Q", 6: "synth:U" })[t] || "synth:X";
+}
+
+function toKicadSch(design, placement) {
+  const byRef = Object.fromEntries(placement.map((p) => [p.ref, p]));
+  const proto = {};
+  for (const p of placement) if (!(p.type in proto)) proto[p.type] = p;
+
+  let o = `(kicad_sch\n\t(version 20250114)\n\t(generator "parser_new_synth")\n\t(generator_version "1.0")\n\t(lib_symbols\n`;
+  for (const [type, pc] of Object.entries(proto)) {
+    const lib = libNameFor(+type);
+    o += `\t\t(symbol "${lib}"\n\t\t\t(symbol "${lib}_0_1"\n`;
+    for (const pn of pc.pin_offsets) {
+      o += `\t\t\t\t(pin passive line (at ${pn.x} ${pn.y} 0) (length 1.27) (name "~") (number "${pn.name}"))\n`;
+    }
+    o += `\t\t\t)\n\t\t)\n`;
+  }
+  o += `\t)\n`;
+
+  for (const c of design.components) {
+    const pc = byRef[c.ref];
+    const x = pc?.at.x ?? 0, y = pc?.at.y ?? 0;
+    const value = c.mpn || String(c.value);
+    o += `\t(symbol\n\t\t(lib_id "${libNameFor(c.type)}")\n\t\t(at ${x} ${y} 0)\n\t\t(unit 1)\n`;
+    o += `\t\t(property "Reference" "${c.ref}" (at ${x} ${y - 5.08} 0))\n`;
+    o += `\t\t(property "Value" "${value}" (at ${x} ${y + 5.08} 0))\n`;
+    if (c.package) o += `\t\t(property "Footprint" "${c.package}" (at ${x} ${y} 0))\n`;
+    o += `\t)\n`;
+  }
+
+  for (const c of design.components) {
+    const pc = byRef[c.ref];
+    if (!pc) continue;
+    c.pins.forEach((pin, j) => {
+      if (j >= pc.pin_offsets.length) return;
+      const net = design.nodes[pin.node]?.name;
+      if (!net) return;
+      const wx = pc.at.x + pc.pin_offsets[j].x;
+      const wy = pc.at.y + pc.pin_offsets[j].y;
+      o += `\t(label "${net}" (at ${wx} ${wy} 0))\n`;
+    });
+  }
+  o += `)\n`;
+  return o;
+}
+
+function toNetlist(design) {
+  const terminals = design.nodes.map(() => []);
+  for (const c of design.components) {
+    for (const p of c.pins) {
+      if (p.node >= 0 && p.node < terminals.length) terminals[p.node].push(`${c.ref}.${p.name}`);
+    }
+  }
+  return {
+    topology: design.topology,
+    nodes: design.nodes.map((n) => n.name),
+    components: design.components.map((c) => ({
+      ref: c.ref,
+      role: c.role,
+      type: PartTypeName[c.type] || "Unknown",
+      value: c.value,
+      mpn: c.mpn || null,
+      package: c.package,
+      pins: c.pins.map((p) => ({
+        name: p.name,
+        node: design.nodes[p.node]?.name ?? null,
+      })),
+    })),
+    nets: design.nodes.map((n, i) => ({ name: n.name, pins: terminals[i] })),
+  };
+}
+
+/** Full pipeline: prompt â†’ verified IR â†’ schematic text. */
+function synthesize(prompt, withController = false) {
+  const parsed = parseBuckPrompt(prompt);
+  if (!parsed.ok) return { ok: false, error: `prompt parse failed: ${parsed.error}` };
+
+  const design = instantiate(buildBuckTopology(withController));
+  const sizing = sizeBuck(parsed.spec, design);
+  if (!sizing.ok) return { ok: false, error: `sizing failed: ${sizing.error}` };
+
+  const req = computeRequirements(parsed.spec, sizing);
+  const bind = bindDesign(design, req, buildMockCatalog());
+  if (!bind.all_bound) {
+    return { ok: false, error: "part binding failed (a required component had no valid part)", bind };
+  }
+
+  const erc = runErc(design);
+  if (!erc.ok) return { ok: false, error: "verified IR failed ERC", erc };
+
+  const placement = placeDesign(design);
+  const kicad = toKicadSch(design, placement);
+  const netlist = toNetlist(design);
+
+  let bind_trace = "";
+  for (const o of bind.outcomes) {
+    bind_trace += `${o.ref} (${o.role}): `;
+    if (o.skipped) bind_trace += "SKIPPED\n";
+    else if (o.bound) bind_trace += `BOUND -> ${o.chosen_mpn}\n`;
+    else bind_trace += "FAILED\n";
+    for (const rc of o.rejected) bind_trace += `    rejected ${rc.mpn} : ${rc.reason}\n`;
+  }
+
+  let nets_text = "";
+  for (const n of netlist.nets) {
+    nets_text += `${n.name}: ${n.pins.join(", ")}\n`;
+  }
+
+  return {
+    ok: true,
+    topology: design.topology,
+    kicad_path: "design.kicad_sch",
+    erc_ok: erc.ok,
+    erc,
+    spec: parsed.spec,
+    sizing,
+    nodes: design.nodes.map((n) => n.name),
+    components: design.components.map((c) => ({
+      ref: c.ref,
+      role: c.role,
+      mpn: c.mpn || null,
+      value: c.value,
+      package: c.package,
+    })),
+    bind_trace,
+    nets_text,
+    netlist,
+    kicad,
+  };
+}
+
+    // ===== UI =====
+    const $ = (id) => document.getElementById(id);
+
+    document.querySelectorAll(".examples button").forEach((b) => {
+      b.addEventListener("click", () => { $("prompt").value = b.dataset.p; });
+    });
+
+    function fmt(v, unit) {
+      if (Math.abs(v) >= 1e-3 && Math.abs(v) < 1) return (v * 1e3).toFixed(3) + " m" + unit;
+      if (Math.abs(v) < 1e-3 && Math.abs(v) >= 1e-6) return (v * 1e6).toFixed(3) + " µ" + unit;
+      if (Math.abs(v) < 1e-6) return (v * 1e9).toFixed(3) + " n" + unit;
+      return v.toFixed(4) + " " + unit;
+    }
+
+    function blobUrl(text, type) {
+      return URL.createObjectURL(new Blob([text], { type }));
+    }
+
+    $("run").addEventListener("click", () => {
+      const btn = $("run");
+      const status = $("status");
+      btn.disabled = true;
+      status.className = "status show ok";
+      status.textContent = "Running pipeline…";
+
+      try {
+        const data = synthesize($("prompt").value, $("controller").checked);
+        if (!data.ok) {
+          status.className = "status show err";
+          status.textContent = "FAILED: " + (data.error || "unknown error");
+          $("results").classList.remove("show");
+          return;
+        }
+
+        status.className = "status show ok";
+        status.textContent = "OK — synthesized " + data.components.length + " components, "
+          + data.nodes.length + " nets (offline single-file debug build)";
+
+        $("spec").innerHTML =
+          "<div><span>Vin</span>  " + data.spec.vin_v + " V</div>" +
+          "<div><span>Vout</span> " + data.spec.vout_v + " V</div>" +
+          "<div><span>Iout</span> " + data.spec.iout_a + " A</div>" +
+          "<div><span>fsw</span>  " + (data.spec.fsw_hz / 1e3).toFixed(0) + " kHz</div>" +
+          "<div><span>Topology</span> " + data.topology + "</div>";
+
+        $("sizing").innerHTML =
+          "<div><span>Duty</span> " + data.sizing.duty.toFixed(4) + "</div>" +
+          "<div><span>ΔIL</span> " + data.sizing.delta_il.toFixed(3) + " A</div>" +
+          "<div><span>IL_pk</span> " + data.sizing.il_peak.toFixed(3) + " A</div>" +
+          "<div><span>L</span> " + fmt(data.sizing.l_henries, "H") + "</div>" +
+          "<div><span>Cin</span> " + fmt(data.sizing.cin_farads, "F") + "</div>" +
+          "<div><span>Cout</span> " + fmt(data.sizing.cout_farads, "F") + "</div>";
+
+        $("erc-pill").innerHTML = data.erc_ok
+          ? '<span class="pill ok">ERC OK</span>'
+          : '<span class="pill warn">ERC issues</span>';
+
+        $("parts").innerHTML = data.components.map((c) =>
+          "<tr><td>" + c.ref + "</td><td>" + c.role + "</td>" +
+          "<td class='mono'>" + (c.mpn || "—") + "</td>" +
+          "<td class='mono'>" + c.value + "</td>" +
+          "<td>" + (c.package || "—") + "</td></tr>"
+        ).join("");
+
+        $("bind").textContent = data.bind_trace || "(none)";
+        $("nets").textContent = data.nets_text || "";
+        $("json").textContent = JSON.stringify(data.netlist, null, 2);
+
+        $("dl-sch").href = blobUrl(data.kicad, "application/octet-stream");
+        $("dl-sch").download = "design.kicad_sch";
+        $("dl-json").href = blobUrl(JSON.stringify(data.netlist, null, 2), "application/json");
+        $("dl-json").download = "netlist.json";
+        $("results").classList.add("show");
+      } catch (e) {
+        status.className = "status show err";
+        status.textContent = "Failed: " + e.message;
+        console.error(e);
+      } finally {
+        btn.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>
