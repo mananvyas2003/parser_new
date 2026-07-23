@@ -1,0 +1,76 @@
+{
+  "topology": "buck_converter_controlled",
+  "nodes": ["VIN", "SW", "VOUT", "GND", "DRIVE"],
+  "components": [
+    {
+      "ref": "Q1",
+      "role": "HS_SWITCH",
+      "type": "Mosfet",
+      "value": 0,
+      "mpn": "MOS-30V-8A",
+      "package": "PowerPAK",
+      "pins": [{"name": "D", "node": "VIN"}, {"name": "S", "node": "SW"}, {"name": "G", "node": "DRIVE"}]
+    },
+    {
+      "ref": "D1",
+      "role": "FREEWHEEL_DIODE",
+      "type": "Diode",
+      "value": 0,
+      "mpn": "DIO-40V-5A",
+      "package": "SMA",
+      "pins": [{"name": "K", "node": "SW"}, {"name": "A", "node": "GND"}]
+    },
+    {
+      "ref": "L1",
+      "role": "OUTPUT_INDUCTOR",
+      "type": "Inductor",
+      "value": 6.8e-06,
+      "mpn": "IND-6R8-5A0",
+      "package": "1210",
+      "pins": [{"name": "1", "node": "SW"}, {"name": "2", "node": "VOUT"}]
+    },
+    {
+      "ref": "C1",
+      "role": "INPUT_CAP",
+      "type": "Capacitor",
+      "value": 6.8e-06,
+      "mpn": "CAP-6U8-16V",
+      "package": "0805",
+      "pins": [{"name": "1", "node": "VIN"}, {"name": "2", "node": "GND"}]
+    },
+    {
+      "ref": "C2",
+      "role": "OUTPUT_CAP",
+      "type": "Capacitor",
+      "value": 4.7e-06,
+      "mpn": "CAP-4U7-25V",
+      "package": "0805",
+      "pins": [{"name": "1", "node": "VOUT"}, {"name": "2", "node": "GND"}]
+    },
+    {
+      "ref": "R1",
+      "role": "LOAD",
+      "type": "Resistor",
+      "value": 1.66667,
+      "mpn": null,
+      "package": "",
+      "pins": [{"name": "1", "node": "VOUT"}, {"name": "2", "node": "GND"}]
+    },
+    {
+      "ref": "U1",
+      "role": "CONTROLLER",
+      "type": "IC",
+      "value": 0,
+      "mpn": "BUCK-CTRL-1",
+      "package": "SOIC-8",
+      "pins": [{"name": "VIN", "node": "VIN"}, {"name": "GND", "node": "GND"}, {"name": "SW", "node": "SW"}, {"name": "FB", "node": "VOUT"}, {"name": "GATE", "node": "DRIVE"}]
+    }
+  ],
+  "nets": [
+    {"name": "VIN", "pins": ["Q1.D", "C1.1", "U1.VIN"]},
+    {"name": "SW", "pins": ["Q1.S", "D1.K", "L1.1", "U1.SW"]},
+    {"name": "VOUT", "pins": ["L1.2", "C2.1", "R1.1", "U1.FB"]},
+    {"name": "GND", "pins": ["D1.A", "C1.2", "C2.2", "R1.2", "U1.GND"]},
+    {"name": "DRIVE", "pins": ["Q1.G", "U1.GATE"]}
+  ]
+}

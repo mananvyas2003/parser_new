@@ -1,0 +1,98 @@
+(kicad_sch
+	(version 20250114)
+	(generator "parser_new_synth")
+	(generator_version "1.0")
+	(lib_symbols
+		(symbol "synth:R"
+			(symbol "synth:R_0_1"
+				(pin passive line (at 0 1.27 0) (length 1.27) (name "~") (number "1"))
+				(pin passive line (at 0 -1.27 0) (length 1.27) (name "~") (number "2"))
+			)
+		)
+		(symbol "synth:C"
+			(symbol "synth:C_0_1"
+				(pin passive line (at 0 1.27 0) (length 1.27) (name "~") (number "1"))
+				(pin passive line (at 0 -1.27 0) (length 1.27) (name "~") (number "2"))
+			)
+		)
+		(symbol "synth:L"
+			(symbol "synth:L_0_1"
+				(pin passive line (at 0 1.27 0) (length 1.27) (name "~") (number "1"))
+				(pin passive line (at 0 -1.27 0) (length 1.27) (name "~") (number "2"))
+			)
+		)
+		(symbol "synth:D"
+			(symbol "synth:D_0_1"
+				(pin passive line (at 0 1.27 0) (length 1.27) (name "~") (number "K"))
+				(pin passive line (at 0 -1.27 0) (length 1.27) (name "~") (number "A"))
+			)
+		)
+		(symbol "synth:Q"
+			(symbol "synth:Q_0_1"
+				(pin passive line (at 0 2.54 0) (length 1.27) (name "~") (number "D"))
+				(pin passive line (at 0 0 0) (length 1.27) (name "~") (number "S"))
+				(pin passive line (at 0 -2.54 0) (length 1.27) (name "~") (number "G"))
+			)
+		)
+	)
+	(symbol
+		(lib_id "synth:Q")
+		(at 25.4 25.4 0)
+		(unit 1)
+		(property "Reference" "Q1" (at 25.4 20.32 0))
+		(property "Value" "MOS-30V-8A" (at 25.4 30.48 0))
+		(property "Footprint" "PowerPAK" (at 25.4 25.4 0))
+	)
+	(symbol
+		(lib_id "synth:D")
+		(at 76.2 25.4 0)
+		(unit 1)
+		(property "Reference" "D1" (at 76.2 20.32 0))
+		(property "Value" "DIO-40V-5A" (at 76.2 30.48 0))
+		(property "Footprint" "SMA" (at 76.2 25.4 0))
+	)
+	(symbol
+		(lib_id "synth:L")
+		(at 127 25.4 0)
+		(unit 1)
+		(property "Reference" "L1" (at 127 20.32 0))
+		(property "Value" "IND-6R8-5A0" (at 127 30.48 0))
+		(property "Footprint" "1210" (at 127 25.4 0))
+	)
+	(symbol
+		(lib_id "synth:C")
+		(at 25.4 76.2 0)
+		(unit 1)
+		(property "Reference" "C1" (at 25.4 71.12 0))
+		(property "Value" "CAP-6U8-16V" (at 25.4 81.28 0))
+		(property "Footprint" "0805" (at 25.4 76.2 0))
+	)
+	(symbol
+		(lib_id "synth:C")
+		(at 76.2 76.2 0)
+		(unit 1)
+		(property "Reference" "C2" (at 76.2 71.12 0))
+		(property "Value" "CAP-4U7-25V" (at 76.2 81.28 0))
+		(property "Footprint" "0805" (at 76.2 76.2 0))
+	)
+	(symbol
+		(lib_id "synth:R")
+		(at 127 76.2 0)
+		(unit 1)
+		(property "Reference" "R1" (at 127 71.12 0))
+		(property "Value" "1.66667" (at 127 81.28 0))
+	)
+	(label "VIN" (at 25.4 27.94 0))
+	(label "SW" (at 25.4 25.4 0))
+	(label "DRIVE" (at 25.4 22.86 0))
+	(label "SW" (at 76.2 26.67 0))
+	(label "GND" (at 76.2 24.13 0))
+	(label "SW" (at 127 26.67 0))
+	(label "VOUT" (at 127 24.13 0))
+	(label "VIN" (at 25.4 77.47 0))
+	(label "GND" (at 25.4 74.93 0))
+	(label "VOUT" (at 76.2 77.47 0))
+	(label "GND" (at 76.2 74.93 0))
+	(label "VOUT" (at 127 77.47 0))
+	(label "GND" (at 127 74.93 0))
+)

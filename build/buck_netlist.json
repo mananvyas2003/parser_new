@@ -1,0 +1,67 @@
+{
+  "topology": "buck_converter",
+  "nodes": ["VIN", "SW", "DRIVE", "GND", "VOUT"],
+  "components": [
+    {
+      "ref": "Q1",
+      "role": "HS_SWITCH",
+      "type": "Mosfet",
+      "value": 0,
+      "mpn": null,
+      "package": "",
+      "pins": [{"name": "D", "node": "VIN"}, {"name": "S", "node": "SW"}, {"name": "G", "node": "DRIVE"}]
+    },
+    {
+      "ref": "D1",
+      "role": "FREEWHEEL_DIODE",
+      "type": "Diode",
+      "value": 0,
+      "mpn": null,
+      "package": "",
+      "pins": [{"name": "K", "node": "SW"}, {"name": "A", "node": "GND"}]
+    },
+    {
+      "ref": "L1",
+      "role": "OUTPUT_INDUCTOR",
+      "type": "Inductor",
+      "value": 0,
+      "mpn": null,
+      "package": "",
+      "pins": [{"name": "1", "node": "SW"}, {"name": "2", "node": "VOUT"}]
+    },
+    {
+      "ref": "Cin",
+      "role": "INPUT_CAP",
+      "type": "Capacitor",
+      "value": 0,
+      "mpn": null,
+      "package": "",
+      "pins": [{"name": "1", "node": "VIN"}, {"name": "2", "node": "GND"}]
+    },
+    {
+      "ref": "Cout",
+      "role": "OUTPUT_CAP",
+      "type": "Capacitor",
+      "value": 0,
+      "mpn": null,
+      "package": "",
+      "pins": [{"name": "1", "node": "VOUT"}, {"name": "2", "node": "GND"}]
+    },
+    {
+      "ref": "Rload",
+      "role": "LOAD",
+      "type": "Resistor",
+      "value": 0,
+      "mpn": null,
+      "package": "",
+      "pins": [{"name": "1", "node": "VOUT"}, {"name": "2", "node": "GND"}]
+    }
+  ],
+  "nets": [
+    {"name": "VIN", "pins": ["Q1.D", "Cin.1"]},
+    {"name": "SW", "pins": ["Q1.S", "D1.K", "L1.1"]},
+    {"name": "DRIVE", "pins": ["Q1.G"]},
+    {"name": "GND", "pins": ["D1.A", "Cin.2", "Cout.2", "Rload.2"]},
+    {"name": "VOUT", "pins": ["L1.2", "Cout.1", "Rload.1"]}
+  ]
+}
