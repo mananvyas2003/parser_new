@@ -1,0 +1,10 @@
+{
+  "name": "circuit-synthesis-compiler",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Circuit synthesis compiler demo (prompt → verified IR → KiCad)",
+  "scripts": {
+    "dev": "npx --yes serve public -l 3000",
+    "start": "npx --yes serve public -l 3000"
+  }
+}
