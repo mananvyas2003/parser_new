@@ -6,9 +6,7 @@
 // ---------------------------------------------------------
 // Constructor
 // ---------------------------------------------------------
-
-Interpreter::Interpreter(
-    const std::vector<ASTNode>& p)
+Interpreter::Interpreter(const std::vector<ASTNode>& p)
     : pool(p)
 {
 }
@@ -16,188 +14,299 @@ Interpreter::Interpreter(
 // ---------------------------------------------------------
 // Execute
 // ---------------------------------------------------------
-
-Schematic Interpreter::Execute(
-    uint32_t root)
+Schematic Interpreter::Execute(uint32_t root)
 {
     Visit(root);
+
+    PrintLibrarySymbols();
+
+    PrintLibrarySymbolDetails();
 
     return schematic;
 }
 
-// ---------------------------------------------------------
-// GetText
-// ---------------------------------------------------------
 
-std::string Interpreter::GetText(
-    uint32_t idx)
-{
-    if (idx == 0)
-        return "";
-
-    const ASTNode& node = pool[idx];
-
-    if (node.text.start == nullptr)
-        return "";
-
-    return std::string(
-        node.text.start,
-        node.text.length);
-}
-
-// ---------------------------------------------------------
-// GetNumber
-// ---------------------------------------------------------
-
-double Interpreter::GetNumber(
-    uint32_t idx)
-{
-    if (idx == 0)
-        return 0.0;
-
-    return pool[idx].number_value;
-}
-
-// ---------------------------------------------------------
-// NodeNameEquals
-// ---------------------------------------------------------
-
-bool Interpreter::NodeNameEquals(
+void Interpreter::ExtractLibraryPinsRecursive(
     uint32_t idx,
-    const char* expected)
+    LibrarySymbol& symbol)
 {
     if (idx == 0)
-        return false;
+        return;
 
-    const ASTNode& node = pool[idx];
+    if (NodeNameEquals(idx, "pin"))
+    {
+        ExtractLibraryPin(
+            idx,
+            symbol);
 
-    if (node.type != NodeType::List)
-        return false;
-
-    uint32_t first =
-        node.first_child;
-
-    if (first == 0)
-        return false;
-
-    const ASTNode& name_node =
-        pool[first];
-
-    if (name_node.type != NodeType::Symbol)
-        return false;
-
-    size_t expected_len =
-        std::strlen(expected);
-
-    if (name_node.text.length != expected_len)
-        return false;
-
-    return std::memcmp(
-        name_node.text.start,
-        expected,
-        expected_len) == 0;
-}
-
-// ---------------------------------------------------------
-// FindNamedChild
-// ---------------------------------------------------------
-
-uint32_t Interpreter::FindNamedChild(
-    uint32_t idx,
-    const char* name)
-{
-    if (idx == 0)
-        return 0;
+        return;
+    }
 
     uint32_t child =
         pool[idx].first_child;
 
-    if (child != 0)
+    while (child != 0)
     {
+        ExtractLibraryPinsRecursive(
+            child,
+            symbol);
+
         child =
             pool[child].next_sibling;
     }
+}
+
+
+void Interpreter::ExtractLibrarySymbols(uint32_t idx)
+{
+    uint32_t child =
+        pool[idx].first_child;
+
+    if (child == 0)
+        return;
+
+    child =
+        pool[child].next_sibling;
 
     while (child != 0)
     {
-        if (NodeNameEquals(child, name))
+        if (NodeNameEquals(child, "symbol"))
         {
-            return child;
+            ExtractLibrarySymbol(child);
+        }
+
+        child =
+            pool[child].next_sibling;
+    }
+}
+
+void Interpreter::ExtractLibrarySymbol(uint32_t idx)
+{
+    uint32_t child =
+        pool[idx].first_child;
+
+    if (child == 0)
+        return;
+
+    child =
+        pool[child].next_sibling;
+
+    if (child == 0)
+        return;
+
+    LibrarySymbol symbol;
+
+    symbol.name =
+        GetText(child);
+
+    std::cout
+        << "\nLIB SYMBOL : "
+        << symbol.name
+        << "\n";
+
+    ExtractLibraryPinsRecursive(
+        idx,
+        symbol);
+
+    std::cout
+        << "Pins Found : "
+        << symbol.pins.size()
+        << "\n";
+
+    library_symbols[symbol.name] =
+        symbol;
+}
+
+void Interpreter::ExtractLibraryPin(
+    uint32_t idx,
+    LibrarySymbol& symbol)
+{
+    LibraryPin pin;
+
+    uint32_t child =
+        pool[idx].first_child;
+
+    child =
+        pool[child].next_sibling;
+
+    while (child != 0)
+    {
+        if (NodeNameEquals(child, "number"))
+        {
+            pin.number =
+                GetSecondChildText(child);
+        }
+
+        else if (NodeNameEquals(child, "name"))
+        {
+            pin.name =
+                GetSecondChildText(child);
+        }
+
+        else if (NodeNameEquals(child, "at"))
+        {
+            ExtractAt(
+                child,
+                pin.offset,
+                pin.rotation);
         }
 
         child =
             pool[child].next_sibling;
     }
 
+    symbol.pins.push_back(pin);
+    std::cout
+        << "PIN "
+        << pin.number
+        << " "
+        << pin.name
+        << " @ "
+        << pin.offset.x
+        << ", "
+        << pin.offset.y
+        << "\n";
+}
+
+
+void Interpreter::PrintLibrarySymbolDetails() const
+{
+    std::cout
+        << "\n==============================\n"
+        << "LIBRARY PIN DATABASE\n"
+        << "==============================\n";
+
+    for (const auto& kv : library_symbols)
+    {
+        const LibrarySymbol& symbol =
+            kv.second;
+
+        std::cout
+            << "\n"
+            << symbol.name
+            << "\n";
+
+        std::cout
+            << "Pins : "
+            << symbol.pins.size()
+            << "\n";
+
+        for (size_t i = 0;
+            i < symbol.pins.size() && i < 5;
+            i++)
+        {
+            const auto& pin =
+                symbol.pins[i];
+
+            std::cout
+                << "  "
+                << pin.number
+                << " "
+                << pin.name
+                << " @ "
+                << pin.offset.x
+                << ", "
+                << pin.offset.y
+                << "\n";
+        }
+    }
+}
+
+
+// ---------------------------------------------------------
+// GetText
+// ---------------------------------------------------------
+std::string Interpreter::GetText(uint32_t idx)
+{
+    if (idx == 0) return "";
+    const ASTNode& node = pool[idx];
+    if (node.text.start == nullptr) return "";
+
+    return std::string(node.text.start, node.text.length);
+}
+
+// ---------------------------------------------------------
+// GetNumber
+// ---------------------------------------------------------
+double Interpreter::GetNumber(uint32_t idx)
+{
+    if (idx == 0) return 0.0;
+    return pool[idx].number_value;
+}
+
+// ---------------------------------------------------------
+// NodeNameEquals
+// ---------------------------------------------------------
+bool Interpreter::NodeNameEquals(uint32_t idx, const char* expected)
+{
+    if (idx == 0) return false;
+    const ASTNode& node = pool[idx];
+    if (node.type != NodeType::List) return false;
+
+    uint32_t first = node.first_child;
+    if (first == 0) return false;
+
+    const ASTNode& name_node = pool[first];
+    if (name_node.type != NodeType::Symbol) return false;
+
+    size_t expected_len = std::strlen(expected);
+    if (name_node.text.length != expected_len) return false;
+
+    return std::memcmp(name_node.text.start, expected, expected_len) == 0;
+}
+
+// ---------------------------------------------------------
+// FindNamedChild
+// ---------------------------------------------------------
+uint32_t Interpreter::FindNamedChild(uint32_t idx, const char* name)
+{
+    if (idx == 0) return 0;
+    uint32_t child = pool[idx].first_child;
+    if (child != 0)
+    {
+        child = pool[child].next_sibling;
+    }
+
+    while (child != 0)
+    {
+        if (NodeNameEquals(child, name)) return child;
+        child = pool[child].next_sibling;
+    }
     return 0;
 }
 
 // ---------------------------------------------------------
 // ExtractXY
-// Handles:
-// (xy 10 20)
 // ---------------------------------------------------------
-
-bool Interpreter::ExtractXY(
-    uint32_t xy_node,
-    Point& point)
+bool Interpreter::ExtractXY(uint32_t xy_node, Point& point)
 {
-    if (!NodeNameEquals(xy_node, "xy"))
-        return false;
+    if (!NodeNameEquals(xy_node, "xy")) return false;
 
-    uint32_t child =
-        pool[xy_node].first_child;
+    uint32_t child = pool[xy_node].first_child;
+    child = pool[child].next_sibling;
+    if (child == 0) return false;
+    point.x = GetNumber(child);
 
-    child =
-        pool[child].next_sibling;
-
-    if (child == 0)
-        return false;
-
-    point.x =
-        GetNumber(child);
-
-    child =
-        pool[child].next_sibling;
-
-    if (child == 0)
-        return false;
-
-    point.y =
-        GetNumber(child);
+    child = pool[child].next_sibling;
+    if (child == 0) return false;
+    point.y = GetNumber(child);
 
     return true;
 }
 
 // ---------------------------------------------------------
 // ExtractWire
-//
-// (wire
-//   (pts
-//      (xy x1 y1)
-//      (xy x2 y2)
-//   )
-// )
 // ---------------------------------------------------------
-
-void Interpreter::ExtractWire(
-    uint32_t idx)
+void Interpreter::ExtractWire(uint32_t idx)
 {
-    uint32_t pts =
-        FindNamedChild(idx, "pts");
+    uint32_t pts = FindNamedChild(idx, "pts");
+    if (pts == 0) return;
 
-    if (pts == 0)
-        return;
-
-    uint32_t child =
-        pool[pts].first_child;
-
-    child =
-        pool[child].next_sibling;
+    uint32_t child = pool[pts].first_child;
+    child = pool[child].next_sibling;
 
     Point p1{};
     Point p2{};
-
     bool found_first = false;
 
     while (child != 0)
@@ -212,22 +321,427 @@ void Interpreter::ExtractWire(
             else
             {
                 ExtractXY(child, p2);
-
                 WireSegment wire;
-
                 wire.start = p1;
                 wire.end = p2;
-
                 schematic.wires.push_back(wire);
 
-                std::cout
-                    << "Wire: ("
-                    << p1.x << ", "
-                    << p1.y << ") -> ("
-                    << p2.x << ", "
-                    << p2.y << ")\n";
-
+                std::cout << "Wire: (" << p1.x << ", " << p1.y << ") -> (" << p2.x << ", " << p2.y << ")\n";
                 break;
+            }
+        }
+        child = pool[child].next_sibling;
+    }
+}
+
+// ---------------------------------------------------------
+// ExtractJunction
+// ---------------------------------------------------------
+void Interpreter::ExtractJunction(uint32_t idx)
+{
+    uint32_t at = FindNamedChild(idx, "at");
+    if (at == 0) return;
+
+    uint32_t child = pool[at].first_child;
+    child = pool[child].next_sibling;
+    if (child == 0) return;
+
+    Junction junction;
+    junction.location.x = GetNumber(child);
+
+    child = pool[child].next_sibling;
+    if (child == 0) return;
+    junction.location.y = GetNumber(child);
+
+    schematic.junctions.push_back(junction);
+    std::cout << "Junction: (" << junction.location.x << ", " << junction.location.y << ")\n";
+}
+
+std::string Interpreter::GetSecondChildText(uint32_t list_idx)
+{
+    if (list_idx == 0) return "";
+    uint32_t child = pool[list_idx].first_child;
+    if (child == 0) return "";
+
+    child = pool[child].next_sibling;
+    if (child == 0) return "";
+
+    return GetText(child);
+}
+
+bool Interpreter::ExtractAt(uint32_t at_node, Point& point, double& rotation)
+{
+    if (!NodeNameEquals(at_node, "at")) return false;
+
+    uint32_t child = pool[at_node].first_child;
+    child = pool[child].next_sibling;
+    if (child == 0) return false;
+    point.x = GetNumber(child);
+
+    child = pool[child].next_sibling;
+    if (child == 0) return false;
+    point.y = GetNumber(child);
+
+    child = pool[child].next_sibling;
+    if (child != 0)
+    {
+        rotation = GetNumber(child);
+    }
+    return true;
+}
+
+void Interpreter::ExtractProperty(
+    uint32_t property_node,
+    Component& component)
+{
+    uint32_t child =
+        pool[property_node].first_child;
+
+    child =
+        pool[child].next_sibling;
+
+    if (child == 0)
+        return;
+
+    std::string property_name =
+        GetText(child);
+
+    child =
+        pool[child].next_sibling;
+
+    if (child == 0)
+        return;
+
+    std::string property_value =
+        GetText(child);
+
+    std::cout
+        << "Property : "
+        << property_name
+        << " = "
+        << property_value
+        << "\n";
+
+    if (property_name == "Reference")
+    {
+        component.reference =
+            property_value;
+    }
+    else if (property_name == "Value")
+    {
+        component.value =
+            property_value;
+    }
+}
+
+
+Point RotatePoint(
+    const Point& p,
+    double rotation)
+{
+    Point result;
+
+    if (rotation == 0)
+    {
+        result = p;
+    }
+    else if (rotation == 90)
+    {
+        result.x = -p.y;
+        result.y = p.x;
+    }
+    else if (rotation == 180)
+    {
+        result.x = -p.x;
+        result.y = -p.y;
+    }
+    else if (rotation == 270)
+    {
+        result.x = p.y;
+        result.y = -p.x;
+    }
+    else
+    {
+        result = p;
+    }
+
+    return result;
+}
+
+
+
+
+void Interpreter::ExtractComponent(uint32_t idx)
+{
+    // ----------------------------------------------------
+    // Filter out library symbol definitions
+    // ----------------------------------------------------
+
+    uint32_t lib_id =
+        FindNamedChild(idx, "lib_id");
+
+    std::string lib_symbol_name;
+
+    if (lib_id != 0)
+    {
+        lib_symbol_name =
+            GetSecondChildText(lib_id);
+    }
+
+    uint32_t at =
+        FindNamedChild(idx, "at");
+
+    if (lib_id == 0 || at == 0)
+    {
+        return;
+    }
+
+
+
+    Component component;
+
+    // ----------------------------------------------------
+    // Location / Rotation
+    // ----------------------------------------------------
+
+    double rotation = 0.0;
+
+    ExtractAt(
+        at,
+        component.location,
+        rotation);
+
+    component.rotation =
+        rotation;
+
+    // ----------------------------------------------------
+    // Debug Header
+    // ----------------------------------------------------
+
+    std::cout
+        << "\n====================================\n";
+
+    std::cout
+        << "COMPONENT FOUND\n";
+
+    std::cout
+        << "====================================\n";
+
+    std::cout
+        << "Location : "
+        << component.location.x
+        << ", "
+        << component.location.y
+        << "\n";
+
+    std::cout
+        << "Rotation : "
+        << component.rotation
+        << "\n";
+
+    // ----------------------------------------------------
+    // Extract Properties
+    // ----------------------------------------------------
+
+    uint32_t child =
+        pool[idx].first_child;
+
+    while (child != 0)
+    {
+        if (NodeNameEquals(child, "property"))
+        {
+            std::cout
+                << "Property Node Found\n";
+
+            ExtractProperty(
+                child,
+                component);
+        }
+
+        child =
+            pool[child].next_sibling;
+    }
+
+    // ----------------------------------------------------
+    // Final Debug
+    // ----------------------------------------------------
+
+    std::cout
+        << "Reference : "
+        << component.reference
+        << "\n";
+
+    std::cout
+        << "Value     : "
+        << component.value
+        << "\n";
+
+    // ----------------------------------------------------
+    // Extra dump if something looks wrong
+    // ----------------------------------------------------
+
+    if (component.reference.empty())
+    {
+        std::cout
+            << "*** WARNING : EMPTY REFERENCE ***\n";
+
+        child =
+            pool[idx].first_child;
+
+        while (child != 0)
+        {
+            const ASTNode& node =
+                pool[child];
+
+            if (node.type != NodeType::List)
+            {
+                std::cout
+                    << "Child Text: "
+                    << GetText(child)
+                    << "\n";
+            }
+
+            child =
+                node.next_sibling;
+        }
+    }
+
+    // ----------------------------------------------------
+    // Convert KiCad Power Symbols Into Labels
+    // ----------------------------------------------------
+
+    if (component.reference.find("#PWR") == 0)
+    {
+        NetLabel label;
+
+        label.name =
+            component.value;
+
+        label.location =
+            component.location;
+
+        schematic.labels.push_back(
+            label);
+
+        std::cout
+            << "[POWER NET] "
+            << label.name
+            << " @ ("
+            << label.location.x
+            << ", "
+            << label.location.y
+            << ")\n";
+    }
+
+    // ----------------------------------------------------
+    // Store Component
+    // ----------------------------------------------------
+
+    ExtractPins(
+        idx,
+        component);
+
+    std::cout
+        << "Pins Found : "
+        << component.pins.size()
+        << "\n";
+
+    auto lib_it =
+        library_symbols.find(
+            lib_symbol_name);
+
+    if (lib_it != library_symbols.end())
+    {
+        const LibrarySymbol& lib =
+            lib_it->second;
+
+        component.pins.reserve(
+            lib.pins.size());
+
+        for (const auto& lib_pin : lib.pins)
+        {
+            Pin pin;
+
+            pin.number =
+                lib_pin.number;
+
+            pin.name =
+                lib_pin.name;
+
+            Point rotated =
+                RotatePoint(
+                    lib_pin.offset,
+                    component.rotation);
+
+            pin.location.x =
+                component.location.x +
+                rotated.x;
+
+            pin.location.y =
+                component.location.y +
+                rotated.y;
+
+            component.pins.push_back(pin);
+        }
+    }
+
+    schematic.components.push_back(
+        component);
+
+    std::cout
+        << "Pins Found : "
+        << component.pins.size()
+        << "\n";
+
+    if (component.reference == "U1")
+    {
+        for (size_t i = 0;
+            i < component.pins.size() && i < 10;
+            i++)
+        {
+            const auto& pin =
+                component.pins[i];
+
+            std::cout
+                << pin.number
+                << " "
+                << pin.name
+                << " @ "
+                << pin.location.x
+                << ", "
+                << pin.location.y
+                << "\n";
+        }
+    }
+
+}
+
+void Interpreter::ExtractPins(
+    uint32_t idx,
+    Component& component)
+{
+    uint32_t child =
+        pool[idx].first_child;
+
+    while (child != 0)
+    {
+        if (NodeNameEquals(child, "pin"))
+        {
+            std::cout
+                << "\nPIN NODE FOUND\n";
+
+            uint32_t pin_child =
+                pool[child].first_child;
+
+            while (pin_child != 0)
+            {
+                std::cout
+                    << "   CHILD : "
+                    << GetText(pin_child)
+                    << "\n";
+
+                pin_child =
+                    pool[pin_child].next_sibling;
             }
         }
 
@@ -237,84 +751,141 @@ void Interpreter::ExtractWire(
 }
 
 // ---------------------------------------------------------
-// ExtractJunction
-//
-// (junction
-//   (at x y)
-// )
+// Label Handlers
 // ---------------------------------------------------------
-
-void Interpreter::ExtractJunction(
-    uint32_t idx)
+bool Interpreter::ExtractLabelData(uint32_t idx, NetLabel& label)
 {
-    uint32_t at =
-        FindNamedChild(idx, "at");
+    uint32_t child = pool[idx].first_child;
+    if (child == 0) return false;
 
-    if (at == 0)
-        return;
+    child = pool[child].next_sibling;
+    bool found_name = false;
 
-    uint32_t child =
-        pool[at].first_child;
+    while (child != 0)
+    {
+        if (pool[child].type == NodeType::String || pool[child].type == NodeType::Symbol)
+        {
+            label.name = GetText(child);
+            found_name = true;
+            break;
+        }
+        child = pool[child].next_sibling;
+    }
 
-    child =
-        pool[child].next_sibling;
+    if (!found_name) return false;
 
-    if (child == 0)
-        return;
+    uint32_t at = FindNamedChild(idx, "at");
+    if (at != 0)
+    {
+        double dummy = 0.0;
+        ExtractAt(at, label.location, dummy);
+    }
+    return true;
+}
 
-    Junction junction;
+// Added missing base function implementation
+void Interpreter::ExtractLabel(uint32_t idx, NetLabel& label)
+{
+    if (ExtractLabelData(idx, label))
+    {
+        schematic.labels.push_back(label);
+    }
+}
 
-    junction.location.x =
-        GetNumber(child);
+void Interpreter::ExtractGlobalLabel(uint32_t idx)
+{
+    NetLabel label;
+    label.type = LabelType::Global;
 
-    child =
-        pool[child].next_sibling;
+    if (ExtractLabelData(idx, label))
+    {
+        schematic.labels.push_back(label);
+    }
+}
 
-    if (child == 0)
-        return;
+void Interpreter::ExtractHierarchicalLabel(uint32_t idx)
+{
+    NetLabel label;
+    label.type = LabelType::Hierarchical;
 
-    junction.location.y =
-        GetNumber(child);
+    if (ExtractLabelData(idx, label))
+    {
+        schematic.labels.push_back(label);
+    }
+}
 
-    schematic.junctions.push_back(
-        junction);
-
+void Interpreter::PrintLibrarySymbols() const
+{
     std::cout
-        << "Junction: ("
-        << junction.location.x
-        << ", "
-        << junction.location.y
-        << ")\n";
+        << "\n====================\n"
+        << "LIBRARY SYMBOLS\n"
+        << "====================\n";
+
+    for (const auto& kv : library_symbols)
+    {
+        std::cout
+            << kv.first
+            << "\n";
+    }
 }
 
 // ---------------------------------------------------------
 // Visit
 // ---------------------------------------------------------
-
-void Interpreter::Visit(
-    uint32_t idx)
+void Interpreter::Visit(uint32_t idx)
 {
-    if (idx == 0)
-        return;
+    if (idx == 0) return;
+
+    bool is_top_level_entity = false;
 
     if (NodeNameEquals(idx, "wire"))
     {
         ExtractWire(idx);
+        is_top_level_entity = true;
     }
-
-    if (NodeNameEquals(idx, "junction"))
+    else if (NodeNameEquals(idx, "junction"))
     {
         ExtractJunction(idx);
+        is_top_level_entity = true;
     }
 
-    uint32_t child =
-        pool[idx].first_child;
-
-    while (child != 0)
+    else if (NodeNameEquals(idx, "lib_symbols"))
     {
-        Visit(child);
+        ExtractLibrarySymbols(idx);
 
-        child =
-            pool[child].next_sibling;
+        is_top_level_entity = true;
+    }
+
+    else if (NodeNameEquals(idx, "symbol"))
+    {
+        ExtractComponent(idx);
+        is_top_level_entity = true;
+    }
+    else if (NodeNameEquals(idx, "label"))
+    {
+        NetLabel label;
+        label.type = LabelType::Local;
+        ExtractLabel(idx, label);
+        is_top_level_entity = true;
+    }
+    else if (NodeNameEquals(idx, "global_label"))
+    {
+        ExtractGlobalLabel(idx);
+        is_top_level_entity = true;
+    }
+    else if (NodeNameEquals(idx, "hierarchical_label"))
+    {
+        ExtractHierarchicalLabel(idx);
+        is_top_level_entity = true;
+    }
+
+    if (!is_top_level_entity)
+    {
+        uint32_t child = pool[idx].first_child;
+        while (child != 0)
+        {
+            Visit(child);
+            child = pool[child].next_sibling;
+        }
     }
 }

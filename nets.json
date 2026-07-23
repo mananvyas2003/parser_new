@@ -1,0 +1,118 @@
+{
+  "nets": [
+    {
+      "id": 0,
+      "name": "+3V3",
+      "node_count": 26,
+      "component_count": 22
+    },
+    {
+      "id": 1,
+      "name": "",
+      "node_count": 2,
+      "component_count": 1
+    },
+    {
+      "id": 2,
+      "name": "GND",
+      "node_count": 32,
+      "component_count": 28
+    },
+    {
+      "id": 3,
+      "name": "IO0",
+      "node_count": 6,
+      "component_count": 2
+    },
+    {
+      "id": 4,
+      "name": "",
+      "node_count": 4,
+      "component_count": 3
+    },
+    {
+      "id": 5,
+      "name": "+5V",
+      "node_count": 8,
+      "component_count": 7
+    },
+    {
+      "id": 6,
+      "name": "USB_DN",
+      "node_count": 6,
+      "component_count": 2
+    },
+    {
+      "id": 7,
+      "name": "",
+      "node_count": 5,
+      "component_count": 3
+    },
+    {
+      "id": 8,
+      "name": "DATA_R",
+      "node_count": 4,
+      "component_count": 2
+    },
+    {
+      "id": 9,
+      "name": "EN",
+      "node_count": 7,
+      "component_count": 3
+    },
+    {
+      "id": 10,
+      "name": "",
+      "node_count": 2,
+      "component_count": 2
+    },
+    {
+      "id": 11,
+      "name": "AIN0",
+      "node_count": 4,
+      "component_count": 1
+    },
+    {
+      "id": 12,
+      "name": "",
+      "node_count": 6,
+      "component_count": 4
+    },
+    {
+      "id": 13,
+      "name": "IO22",
+      "node_count": 7,
+      "component_count": 3
+    },
+    {
+      "id": 14,
+      "name": "",
+      "node_count": 2,
+      "component_count": 1
+    },
+    {
+      "id": 15,
+      "name": "IO21",
+      "node_count": 7,
+      "component_count": 2
+    },
+    {
+      "id": 16,
+      "name": "USB_DP",
+      "node_count": 6,
+      "component_count": 1
+    },
+    {
+      "id": 17,
+      "name": "DATA_T",
+      "node_count": 4,
+      "component_count": 2
+    },
+    {
+      "id": 18,
+      "name": "",
+      "node_count": 2,
+      "component_count": 2
+    }
+  ]
+}
